@@ -1,0 +1,65 @@
+1️⃣ Клонируйте репозиторий
+git clone https://github.com/ваш-аккаунт/taxi_price_prediction.git   # или скачайте zip и распакуйте
+cd taxi_price_prediction
+Если у вас нет Git – просто создайте папку taxi_price_prediction и скопируйте туда все файлы из структуры, которую мы описали ранее.
+2️⃣ Создайте виртуальное окружение
+# Вариант 1: venv (Python 3.10+)
+python -m venv venv
+source venv/bin/activate        # Linux/macOS
+venv\Scripts\activate           # Windows
+
+# Вариант 2: conda
+conda create -n taxi-pred python=3.11 -y
+conda activate taxi-pred
+3️⃣ Установите зависимости
+pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt   # файл создаём ниже
+4️⃣ Подготовьте данные
+Разместите файлы train.csv и (при наличии) test.csv в папке data/.
+
+Если датасет ещё не скачан, можно получить его из Kaggle:
+
+kaggle competitions download -c ny-taxi-fare-prediction
+unzip ny-taxi-fare-prediction.zip -d data/
+5️⃣ Запуск ноутбука
+jupyter notebook notebooks/01_explore.ipynb
+В ноутбуке шаг за шагом выполняются: загрузка данных, EDA, создание пайплайна, обучение моделей, сравнение по MAE и сохранение лучшей модели в results/best_model.pkl.
+Если тестовый набор присутствует – будет создан файл results/predictions.csv с предсказаниями.
+6️⃣ Запуск как скрипт (опционально)
+Если не хотите использовать Jupyter, можно запустить основную часть из src/models.py.
+
+python - <<'PY'
+from src import preprocess, models, utils
+import pathlib, joblib
+
+# Шаги из ноутбука (сокращённо)
+df = preprocess.load_data("../data/train.csv")
+X, y = df.drop(columns=['fare_amount']), df['fare_amount']
+
+# Простейший пайплайн без дополнительных признаков:
+numeric_features = ['trip_distance']
+preprocessor = models.create_preprocessor(numeric_features, [])
+pipe = models.build_pipeline(preprocessor, models.get_models()['LinearRegression'])
+pipe.fit(X, y)
+
+joblib.dump(pipe, "../results/best_model.pkl")
+print("Модель сохранена в results/best_model.pkl")
+PY
+7️⃣ Проверка качества
+После обучения вы можете проверить MAE:
+
+from sklearn.metrics import mean_absolute_error
+import joblib, pandas as pd
+
+model = joblib.load("../results/best_model.pkl")
+preds = model.predict(X)
+print("MAE:", mean_absolute_error(y, preds))
+8️⃣ (Опционально) Визуализация важности признаков
+from src import utils
+utils.plot_feature_importance(model.named_steps['regressor'], numeric_features)
+ Что дальше?
+Попробуйте добавить новые признаки: расстояние по Haversine, время суток, день недели и т.д.
+Проведите кросс‑валидацию (cross_val_score) для более надёжной оценки.
+Используйте GridSearchCV или Optuna для подбора гиперпараметров XGBoost/LightGBM.
+Если хотите ускорить обучение, можно собрать модели в joblib.parallel_backend('loky').
+Если возникнут ошибки (например, недостающие библиотеки, несовместимые версии), просто поправьте зависимости в requirements.txt и переустановите (pip install -r requirements.txt)
